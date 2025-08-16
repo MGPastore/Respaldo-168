@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Telegram (Local)</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Dashboard Local — Bot de Telegram</h1>
+      <button id="pingBtn" title="Comprobar conexión">Ping Bot</button>
+    </header>
+
+    <section class="panel">
+      <div class="card">
+        <h2>Enviar a un usuario</h2>
+        <label>chat_id</label>
+        <input id="chatId" type="number" placeholder="Ej: 111111111" />
+        <label>Mensaje</label>
+        <textarea id="msgOne" rows="3" placeholder="Escribe tu mensaje"></textarea>
+        <button id="sendOne">Enviar</button>
+      </div>
+
+      <div class="card">
+        <h2>Enviar a whitelist</h2>
+        <label>Mensaje</label>
+        <textarea id="msgAll" rows="3" placeholder="Mensaje para todos"></textarea>
+        <button id="sendAll">Enviar a todos</button>
+        <div id="whitelistBox" class="muted"></div>
+      </div>
+    </section>
+
+    <section class="log">
+      <h2>Mensajes entrantes</h2>
+      <ul id="incoming"></ul>
+    </section>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/client.js"></script>
+</body>
+</html>

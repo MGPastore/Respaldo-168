@@ -1,0 +1,74 @@
+# Informe de Auditoría de Seguridad - Telegram Bot
+
+Fecha de Auditoría: 15 de agosto de 2025
+
+## 1. Resumen General
+
+Este informe detalla los hallazgos de la auditoría de seguridad realizada sobre el código del bot de Telegram. En general, el proyecto demuestra una buena base de seguridad, principalmente gracias al uso del ORM Prisma, que mitiga una de las vulnerabilidades más comunes y críticas: la inyección de SQL.
+
+Sin embargo, se han identificado algunas áreas de mejora relacionadas con la lógica de negocio, el manejo de errores y la validación de entradas que, de no ser atendidas, podrían suponer un riesgo para la aplicación.
+
+## 2. Análisis de Dependencias
+
+Se analizaron las dependencias principales del proyecto en busca de vulnerabilidades conocidas públicamente.
+
+### Telegraf.js (`telegraf@4.16.3`)
+
+*   **Hallazgos:** No se encontraron vulnerabilidades directas y críticas para esta versión específica. La comunidad mantiene la librería activamente.
+*   **Comentarios a tener en cuenta:** Algunas búsquedas sugieren que dependencias de bajo nivel que utiliza Telegraf (como `node-fetch` en el pasado) podrían tener vulnerabilidades. Estas son de bajo riesgo, pero demuestran la importancia de mantener todo el ecosistema actualizado.
+*   **Fuentes:**
+    *   Búsquedas generales en bases de datos de vulnerabilidades como Snyk y repositorios de GitHub.
+
+### Prisma (`prisma@6.14.0` y `@prisma/client@6.14.0`)
+
+*   **Hallazgos:** No se encontraron vulnerabilidades conocidas para estas versiones. Prisma tiene una excelente reputación en cuanto a seguridad.
+*   **Comentarios a tener en cuenta:** La seguridad de Prisma reside en cómo se utiliza. Mientras se eviten las consultas SQL "en crudo" (`$queryRaw`) con datos no sanitizados, el riesgo de inyección de SQL es prácticamente nulo.
+*   **Fuentes:**
+    *   Base de datos de vulnerabilidades de Snyk.
+    *   Issues de seguridad en el repositorio oficial de Prisma en GitHub.
+
+**Recomendación General de Dependencias:**
+Ejecuta `npm audit` en la terminal de tu proyecto. Esta herramienta nativa de NPM analiza todo tu árbol de dependencias y te notificará si alguna de ellas (incluso las dependencias de tus dependencias) tiene una vulnerabilidad conocida.
+
+---
+
+## 3. Vulnerabilidades y Áreas de Mejora Encontradas
+
+### A. Inyección de SQL (SQLi)
+
+*   **Estado:** **NO VULNERABLE.**
+*   **Análisis:** El uso exclusivo del cliente de Prisma para todas las operaciones de base de datos previene eficazmente los ataques de inyección de SQL. Prisma se encarga de separar el código de la consulta de los datos, tratando cualquier entrada del usuario como un valor literal y no como SQL ejecutable. Este es el enfoque correcto y más seguro.
+
+### B. Referencia Insegura y Directa a Objetos (IDOR)
+
+*   **Estado:** **VULNERABILIDAD POTENCIAL ENCONTRADA.**
+*   **Ubicación:** `commands/carrito.js`
+*   **Descripción:** El comando `/pedido_{clienteId}` permite que cualquier usuario autorizado por la whitelist cree un pedido para *cualquier* `clienteId` que exista en la base de datos.
+*   **Escenario de Riesgo:** Un usuario malintencionado (pero autorizado en la whitelist) podría crear pedidos en nombre de otros clientes sin su consentimiento, lo que podría llevar a confusión, manipulación de datos o problemas logísticos.
+*   **Recomendación:** Implementar un control de acceso basado en roles. Por ejemplo, crear una lista de "administradores" en el archivo `.env`. El comando `/pedido_{clienteId}` debería verificar si el `ctx.from.id` del usuario que lo ejecuta pertenece a esa lista de administradores. Si no es un administrador, no se le debería permitir especificar un `clienteId` diferente al suyo.
+
+### C. Exposición de Información Sensible a través de Errores
+
+*   **Estado:** **VULNERABILIDAD POTENCIAL ENCONTRADA.**
+*   **Ubicación:** `commands/carrito.js`
+*   **Descripción:** En la función para crear un pedido, si ocurre un error, el mensaje devuelto al usuario incluye el `error.message` directamente: `ctx.reply(\`No se pudo crear el pedido: ${error.message}\`);`.
+*   **Escenario de Riesgo:** Si un error inesperado ocurre en la capa de servicio o en la base de datos, el mensaje de error podría contener información técnica sensible (nombres de tablas, fragmentos de consultas, rutas del sistema, etc.). Esta información es muy valiosa para un atacante que busca entender la arquitectura interna de la aplicación.
+*   **Recomendación:** Modificar el manejador de errores para que siempre devuelva un mensaje genérico al usuario (ej: "Ocurrió un error al procesar tu pedido. Por favor, contacta a soporte."). El error detallado (`error.message` y el `stack trace` completo) debe registrarse únicamente en la consola del servidor o en un sistema de logging (ej: Sentry, LogDNA) para que los desarrolladores puedan depurarlo.
+
+### D. Falta de Validación de Entradas (Input Validation)
+
+*   **Estado:** **MEJORA RECOMENDADA.**
+*   **Descripción:** El code realiza conversiones de tipo (ej: `parseInt`), lo cual es bueno, pero no valida la naturaleza de las entradas de texto.
+*   **Escenario de Riesgo:** Aunque Prisma previene SQLi, entradas de texto muy largas o con formatos inesperados podrían causar errores no controlados o, en un caso extremo, un consumo excesivo de recursos que podría llevar a una denegación de servicio (DoS). Por ejemplo, si un usuario introduce un nombre de 10,000 caracteres.
+*   **Recomendación:** Implementar un esquema de validación para todas las entradas que provienen del usuario. Librerías como `zod` o `joi` son ideales para definir esquemas de datos (ej: el nombre de un cliente debe ser un string de máximo 100 caracteres) y asegurar que los datos se ajustan a ellos antes de procesarlos.
+
+---
+
+## 4. Conclusión y Pasos a Seguir
+
+El bot tiene una base sólida. Para elevar su nivel de seguridad, se recomienda priorizar los siguientes pasos:
+
+1.  **Corregir la vulnerabilidad IDOR:** Implementar la lógica de administradores para el comando `/pedido_{clienteId}`.
+2.  **Corregir la Fuga de Información:** Cambiar los mensajes de error de cara al usuario por mensajes genéricos.
+3.  **Ejecutar `npm audit`** y solucionar las vulnerabilidades que reporte.
+4.  **Considerar la implementación de un esquema de validación** con `zod` o `joi` para robustecer la aplicación a largo plazo.

@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Producto {
+  id              Int              @id @default(autoincrement())
+  nombre          String
+  precio          Float
+  stock           Int
+  pedidosProducto PedidoProducto[] // Relación inversa a PedidoProducto
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+}
+
+model Pedido {
+  id        Int              @id @default(autoincrement())
+  clienteId Int
+  cliente   Cliente          @relation(fields: [clienteId], references: [id])
+  productos PedidoProducto[] // Relación uno-a-muchos con PedidoProducto
+  total     Float
+  creadoEn  DateTime         @default(now())
+}
+
+model PedidoProducto {
+  id         Int @id @default(autoincrement())
+  pedidoId   Int
+  productoId Int
+  cantidad   Int
+
+  pedido   Pedido   @relation(fields: [pedidoId], references: [id])
+  producto Producto @relation(fields: [productoId], references: [id])
+}
+
+model Material {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  cantidad  Int
+  unidad    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model Carrito {
+  id        Int      @id @default(autoincrement())
+  clienteId Int      @unique // Cada cliente tiene un solo carrito
+  items     Json?    // Almacena los productos y cantidades en formato JSON
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+}
+
+model Cliente {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  telefono  String   @unique
+  direccion String?
+  carrito   Carrito? // Relación uno a uno con Carrito
+  pedidos   Pedido[]
+}
